@@ -1,0 +1,22 @@
+{
+  "name": "tp6",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite frontend --port 5173 --strictPort",
+    "build": "vite build frontend",
+    "preview": "vite preview frontend",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "cy:open": "cypress open",
+    "cy:run": "cypress run"
+  },
+  "jest": {
+    "transform": {}
+  },
+  "devDependencies": {
+    "cypress": "^15.21.1",
+    "jest": "^30.5.2",
+    "vite": "^8.3.0"
+  }
+}
