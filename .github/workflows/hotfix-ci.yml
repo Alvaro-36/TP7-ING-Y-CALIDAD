@@ -44,7 +44,7 @@ defaults:
 env:
   # Carpeta del proyecto relativa a la raiz del repo (valor fijo, no es input).
   APP_DIR: TP6---IyC
-  NODE_VERSION: '20'
+  NODE_VERSION: '24'
 
 jobs:
   # ---------------------------------------------------------------------------
