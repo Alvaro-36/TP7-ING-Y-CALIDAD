@@ -1,43 +1,29 @@
-name: Cypress sobre main y rollback automatico
+name: Cypress sobre main y rollback con Git
 
 on:
   push:
     branches: [main]
 
-# El token automatico solo lee. El push de rollback usa una credencial separada.
+# Solo el job de rollback recibe permiso de escritura.
 permissions:
   contents: read
 
 env:
-  APP_DIR: TP6---IyC
-  # Metadatos publicos: configurar en Settings > Secrets and variables > Actions.
-  HOSTING_SITE: ${{ vars.FIREBASE_HOSTING_SITE_ID_PROD }}
   PUSH_SHA: ${{ github.event.after }}
-  BEFORE_SHA: ${{ github.event.before }}
 
 jobs:
   e2e:
-    name: Probar main realmente publicado
+    name: Probar el commit que llego a main
     if: ${{ !github.event.deleted && !contains(github.event.head_commit.message, 'Auto-Rollback-Of:') }}
     runs-on: ubuntu-latest
-    timeout-minutes: 45
-    concurrency:
-      group: cypress-main-e2e
-      cancel-in-progress: false
+    timeout-minutes: 25
     outputs:
       tests_failed: ${{ steps.cypress.outputs.tests_failed }}
-      failed_release: ${{ steps.hosting.outputs.failed_release }}
-      failed_version: ${{ steps.hosting.outputs.failed_version }}
-      previous_version: ${{ steps.hosting.outputs.previous_version }}
-      previous_sha: ${{ steps.hosting.outputs.previous_sha }}
-      previous_served_sha: ${{ steps.hosting.outputs.previous_served_sha }}
-      base_url: ${{ steps.hosting.outputs.base_url }}
     steps:
       - name: Descargar el commit exacto del push
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.after }}
-          fetch-depth: 0
           persist-credentials: false
 
       - name: Configurar Node.js
@@ -47,191 +33,44 @@ jobs:
           cache: npm
           cache-dependency-path: TP6---IyC/package-lock.json
 
-      - name: Instalar dependencias y el binario de Cypress
+      - name: Instalar dependencias y Cypress
         working-directory: TP6---IyC
         run: |
           npm ci
           npx --no-install cypress install
           npx --no-install cypress verify
 
-      - name: Autenticar lectura del historial de Firebase
-        id: firebase
-        uses: google-github-actions/auth@v3
-        with:
-          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_PROD }}
-          token_format: access_token
-          access_token_scopes: https://www.googleapis.com/auth/firebase.hosting.readonly
-          create_credentials_file: false
-          export_environment_variables: false
-
-      - name: Esperar la publicacion de este SHA y capturar la version anterior
-        id: hosting
-        timeout-minutes: 22
-        uses: actions/github-script@v7
-        env:
-          MODE: snapshot
-          FIREBASE_ACCESS_TOKEN: ${{ steps.firebase.outputs.access_token }}
-        with:
-          # El alias YAML reutiliza exactamente esta logica en el job de rollback.
-          script: &firebase_history |
-            const { HOSTING_SITE: site, PUSH_SHA: sha, BEFORE_SHA: before } = process.env;
-            if (!/^[a-z0-9][a-z0-9-]{1,62}$/.test(site || '')) {
-              throw new Error('Configurar la variable FIREBASE_HOSTING_SITE_ID_PROD.');
-            }
-            if (!/^[a-f0-9]{40}$/.test(sha || '')) throw new Error('SHA de push invalido.');
-            const api = 'https://firebasehosting.googleapis.com/v1beta1/';
-            const channel = `sites/${site}/channels/live`;
-            const baseUrl = `https://${site}.web.app`;
-            const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
-            const servedSha = process.env.PREVIOUS_SERVED_SHA;
-            const marker = `auto-rollback:${sha}:${context.runId}:to:${before}:served:${servedSha}`;
-            const versionPrefix = `sites/${site}/versions/`;
-            const resourceId = release => release?.name?.split('/').pop();
-            const request = async (path, method = 'GET', body) => {
-              const response = await fetch(api + path, {
-                method,
-                headers: {
-                  Authorization: `Bearer ${process.env.FIREBASE_ACCESS_TOKEN}`,
-                  'Content-Type': 'application/json'
-                },
-                body: body === undefined ? undefined : JSON.stringify(body),
-                signal: AbortSignal.timeout(15000)
-              });
-              if (!response.ok) throw new Error(`Firebase: HTTP ${response.status} (${method}).`);
-              return response.json();
-            };
-            const current = async () => (await request(channel)).release;
-            const mainSha = async () => (await github.rest.repos.getBranch({
-              ...context.repo, branch: 'main'
-            })).data.commit.sha;
-            const assertMain = async () => {
-              if (await mainSha() !== sha) {
-                throw new Error('main avanzo a otro commit; no se modifica Firebase ni Git.');
-              }
-            };
-            const receiptMatches = async expected => {
+      - name: Iniciar la aplicacion y esperar a que responda
+        working-directory: TP6---IyC
+        run: |
+          npm run dev -- --host 127.0.0.1 > "$RUNNER_TEMP/vite.log" 2>&1 &
+          echo "$!" > "$RUNNER_TEMP/vite.pid"
+          node --input-type=commonjs <<'NODE'
+          const fs = require('node:fs');
+          (async () => {
+            const deadline = Date.now() + 60000;
+            while (Date.now() < deadline) {
               try {
-                const response = await fetch(
-                  `${baseUrl}/__deployment.json?run=${context.runId}&t=${Date.now()}`,
-                  { cache: 'no-store', signal: AbortSignal.timeout(15000) }
-                );
-                return response.ok && (await response.json()).sha === expected;
-              } catch { return false; }
-            };
-            const stamp = release => {
-              const match = /^(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d)(?:\.(\d{1,9}))?Z$/.exec(release.releaseTime || '');
-              if (!match) throw new Error('El historial contiene una fecha de release invalida.');
-              return match[1] + '.' + (match[2] || '').padEnd(9, '0');
-            };
-
-            if (process.env.MODE === 'snapshot') {
-              let deployed;
-              const deadline = Date.now() + 20 * 60 * 1000;
-              while (Date.now() < deadline) {
-                await assertMain();
-                deployed = await current();
-                if (deployed?.message === `github-sha:${sha}` && await receiptMatches(sha)) break;
-                deployed = undefined;
-                await pause(10000);
-              }
-              if (!deployed) {
-                throw new Error('No se publico este SHA en 20 minutos. Revisar el deploy de main y __deployment.json. No se ejecuta rollback.');
-              }
-              if (!deployed.version?.name?.startsWith(versionPrefix)) {
-                throw new Error('La publicacion no tiene una version valida.');
-              }
-              const releases = [];
-              let pageToken = '';
-              do {
-                const query = new URLSearchParams({ pageSize: '100' });
-                if (pageToken) query.set('pageToken', pageToken);
-                const page = await request(`${channel}/releases?${query}`);
-                releases.push(...(page.releases || []));
-                pageToken = page.nextPageToken || '';
-              } while (pageToken);
-              releases.sort((a, b) => stamp(b).localeCompare(stamp(a)));
-              const index = releases.findIndex(r => resourceId(r) === resourceId(deployed));
-              if (index !== 0) throw new Error('La release cambio durante la lectura del historial.');
-              const previous = releases[index + 1];
-              if (previous && (stamp(previous) === stamp(deployed) ||
-                  (releases[index + 2] && stamp(previous) === stamp(releases[index + 2])))) {
-                throw new Error('Orden ambiguo en el historial; no se selecciona una version al azar.');
-              }
-              let previousSha = /^github-sha:([a-f0-9]{40})$/.exec(previous?.message || '')?.[1] || '';
-              let previousServedSha = previousSha;
-              // Un rollback conserva los archivos del padre, pero Git crea un SHA nuevo.
-              // Reconocer ese caso permite futuros rollbacks sin reconstruir Hosting.
-              const priorRollback = /^auto-rollback:([a-f0-9]{40}):\d+:to:([a-f0-9]{40}):served:([a-f0-9]{40})$/.exec(previous?.message || '');
-              if (priorRollback) {
-                const code = (await github.rest.repos.getCommit({ ...context.repo, ref: before })).data;
-                const restoredCode = (await github.rest.repos.getCommit({ ...context.repo, ref: priorRollback[2] })).data;
-                if (code.commit.message.includes(`Auto-Rollback-Of: ${priorRollback[1]}`) &&
-                    code.commit.tree.sha === restoredCode.commit.tree.sha) {
-                  previousSha = before;
-                  previousServedSha = priorRollback[3];
-                }
-              }
-              const latest = await current();
-              if (resourceId(latest) !== resourceId(deployed) || !await receiptMatches(sha)) {
-                throw new Error('El sitio cambio antes de iniciar Cypress.');
-              }
-              core.setOutput('failed_release', deployed.name);
-              core.setOutput('failed_version', deployed.version.name);
-              core.setOutput('previous_version', previous?.version?.name || '');
-              core.setOutput('previous_sha', previousSha);
-              core.setOutput('previous_served_sha', previousServedSha);
-              core.setOutput('base_url', baseUrl);
-              core.info(`Publicacion identificada para ${sha}. Cypress probara ${baseUrl}.`);
-            } else {
-              const target = process.env.PREVIOUS_VERSION;
-              if (!target?.startsWith(versionPrefix) || process.env.PREVIOUS_SHA !== before ||
-                  !/^[a-f0-9]{40}$/.test(servedSha || '')) {
-                throw new Error('La version inmediatamente anterior no corresponde al padre del commit. No se modifica Firebase ni Git.');
-              }
-              await assertMain();
-              const version = await request(target);
-              if (version.status !== 'FINALIZED') {
-                throw new Error('La version anterior no esta disponible/finalizada. No se hace git revert.');
-              }
-              let latest = await current();
-              const alreadyRestored = latest?.message === marker && latest?.version?.name === target;
-              if (!alreadyRestored) {
-                if (latest?.name !== process.env.FAILED_RELEASE || latest?.version?.name !== process.env.FAILED_VERSION) {
-                  throw new Error('Firebase tiene otra release activa; no se sobrescribe.');
-                }
-                await assertMain();
-                // No se reconstruye ni borra contenido: se publica la version existente.
-                // No se reintenta un POST a ciegas si la respuesta se pierde.
-                try {
-                  await request(`${channel}/releases?${new URLSearchParams({ versionName: target })}`,
-                    'POST', { message: marker });
-                } catch (error) {
-                  latest = await current();
-                  if (latest?.message !== marker || latest?.version?.name !== target) throw error;
-                }
-              }
-              const deadline = Date.now() + 5 * 60 * 1000;
-              while (Date.now() < deadline) {
-                latest = await current();
-                if (latest?.message !== marker || latest?.version?.name !== target) {
-                  throw new Error('La restauracion no es la release activa. NO se hace git revert.');
-                }
-                if (await receiptMatches(servedSha)) {
-                  core.info('Firebase restaurado y comprobado. Ahora se permite git revert.');
-                  return;
-                }
-                await pause(10000);
-              }
-              throw new Error('Firebase acepto la restauracion, pero no se pudo confirmar el sitio servido. NO se hace git revert; requiere revision.');
+                const response = await fetch('http://localhost:5173', {
+                  signal: AbortSignal.timeout(2000)
+                });
+                if (response.ok) return;
+              } catch {}
+              await new Promise(resolve => setTimeout(resolve, 1000));
             }
+            console.error(fs.readFileSync(process.env.RUNNER_TEMP + '/vite.log', 'utf8'));
+            throw new Error('La aplicacion no inicio en http://localhost:5173.');
+          })().catch(error => {
+            console.error(`::error::${error.message}`);
+            process.exitCode = 1;
+          });
+          NODE
 
-      - name: Ejecutar los E2E existentes sobre Firebase
+      - name: Ejecutar los tests E2E existentes
         id: cypress
         continue-on-error: true
         timeout-minutes: 15
         working-directory: TP6---IyC
-        env:
-          CYPRESS_BASE_URL: ${{ steps.hosting.outputs.base_url }}
         run: |
           node --input-type=commonjs <<'NODE'
           const fs = require('node:fs');
@@ -242,7 +81,7 @@ jobs:
             const result = await cypress.run({
               configFile: 'cypress.config.js',
               browser: 'electron',
-              config: { baseUrl: process.env.CYPRESS_BASE_URL, video: true }
+              config: { video: true }
             });
             if (result.failures || !Number.isFinite(result.totalFailed) || !result.totalTests) {
               throw new Error('Cypress no pudo ejecutar tests; no se activa rollback por un fallo de infraestructura.');
@@ -260,14 +99,22 @@ jobs:
           });
           NODE
 
+      - name: Detener la aplicacion
+        if: ${{ always() }}
+        run: |
+          if [[ -f "$RUNNER_TEMP/vite.pid" ]]; then
+            kill "$(cat "$RUNNER_TEMP/vite.pid")" 2>/dev/null || true
+          fi
+
       - name: Guardar evidencias de Cypress
-        if: ${{ always() && steps.cypress.outcome != 'skipped' }}
+        if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
           name: cypress-main-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
             TP6---IyC/cypress/screenshots
             TP6---IyC/cypress/videos
+            ${{ runner.temp }}/vite.log
           if-no-files-found: ignore
           retention-days: 7
 
@@ -278,112 +125,72 @@ jobs:
           exit 1
 
   rollback:
-    name: Restaurar Firebase y despues revertir main
+    name: Revertir el commit fallido en main
     needs: e2e
     if: ${{ always() && !cancelled() && needs.e2e.outputs.tests_failed == 'true' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-    # El JOB de deploy de produccion debe usar este mismo grupo, cancel=false.
-    # No usar este grupo en e2e: impediria que el deploy que espera pudiera correr.
-    concurrency:
-      group: firebase-production-main
-      cancel-in-progress: false
-    env:
-      FAILED_RELEASE: ${{ needs.e2e.outputs.failed_release }}
-      FAILED_VERSION: ${{ needs.e2e.outputs.failed_version }}
-      PREVIOUS_VERSION: ${{ needs.e2e.outputs.previous_version }}
-      PREVIOUS_SHA: ${{ needs.e2e.outputs.previous_sha }}
-      PREVIOUS_SERVED_SHA: ${{ needs.e2e.outputs.previous_served_sha }}
+    timeout-minutes: 10
+    permissions:
+      contents: write
     steps:
-      - name: Descargar el commit que fallo
+      - name: Descargar el commit que fallo y su historial
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.after }}
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Comprobar que se puede revertir sin perder commits posteriores
-        uses: actions/github-script@v7
+      - name: Crear el revert y publicarlo en main
         env:
-          ROLLBACK_TOKEN: ${{ secrets.ROLLBACK_GITHUB_TOKEN }}
-        with:
-          script: |
-            if (!process.env.ROLLBACK_TOKEN) throw new Error('Falta ROLLBACK_GITHUB_TOKEN; no se modifica Firebase.');
-            const access = await fetch(`https://api.github.com/repos/${context.repo.owner}/${context.repo.repo}`, {
-              headers: { Authorization: `Bearer ${process.env.ROLLBACK_TOKEN}`, Accept: 'application/vnd.github+json' },
-              signal: AbortSignal.timeout(15000)
-            });
-            if (!access.ok) throw new Error('La credencial de rollback no puede acceder al repositorio; no se modifica Firebase.');
-            if (context.payload.forced || /^0+$/.test(process.env.BEFORE_SHA)) {
-              throw new Error('Push forzado o inicial: no hay una base segura para rollback automatico.');
-            }
-            const commit = (await github.rest.repos.getCommit({ ...context.repo, ref: process.env.PUSH_SHA })).data;
-            if (commit.parents[0]?.sha !== process.env.BEFORE_SHA || process.env.PREVIOUS_SHA !== process.env.BEFORE_SHA) {
-              throw new Error('El push incluye varios commits o la version anterior no coincide con su padre. Requiere revision; no se modifica Firebase.');
-            }
-            const branch = (await github.rest.repos.getBranch({ ...context.repo, branch: 'main' })).data;
-            if (branch.commit.sha !== process.env.PUSH_SHA) throw new Error('main avanzo; no se hace rollback de un commit antiguo.');
-
-      - name: Autenticar restauracion de Firebase
-        id: firebase
-        uses: google-github-actions/auth@v3
-        with:
-          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_PROD }}
-          token_format: access_token
-          access_token_scopes: https://www.googleapis.com/auth/firebase.hosting
-          create_credentials_file: false
-          export_environment_variables: false
-
-      - name: Restaurar la version anterior desde el historial de Hosting
-        id: restore
-        uses: actions/github-script@v7
-        env:
-          MODE: restore
-          FIREBASE_ACCESS_TOKEN: ${{ steps.firebase.outputs.access_token }}
-        with:
-          script: *firebase_history
-
-      - name: Git revert y push a main SOLO tras restaurar Firebase
-        if: ${{ success() && steps.restore.outcome == 'success' }}
-        env:
-          GH_ROLLBACK_TOKEN: ${{ secrets.ROLLBACK_GITHUB_TOKEN }}
+          GH_PUSH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          stage='preparacion'
           report_failure() {
-            echo '::error::Firebase ya fue restaurado, pero el codigo NO pudo revertirse/publicarse. Revisar main y Firebase manualmente.'
+            echo "::error::Rollback incompleto en la etapa: $stage. No se fuerza ningun push ni se reescribe el historial. Revisar main y los logs."
           }
           trap report_failure ERR
-          # El token se entrega por el entorno, sin guardarlo en origin ni imprimirlo.
+          if [[ ! "$PUSH_SHA" =~ ^[a-f0-9]{40}$ ]]; then
+            echo '::error::El evento no contiene un SHA de commit valido.'
+            exit 1
+          fi
+          if [[ "$(git rev-parse HEAD)" != "$PUSH_SHA" ]]; then
+            echo '::error::El commit descargado no coincide con el SHA del push.'
+            exit 1
+          fi
+          # Autenticacion temporal; el token no se guarda en origin ni se imprime.
           cat > "$RUNNER_TEMP/git-askpass.sh" <<'SH'
           #!/usr/bin/env bash
           case "$1" in
             *Username*) printf '%s\n' 'x-access-token' ;;
-            *Password*) printf '%s\n' "$GH_ROLLBACK_TOKEN" ;;
+            *Password*) printf '%s\n' "$GH_PUSH_TOKEN" ;;
             *) exit 1 ;;
           esac
           SH
           chmod 700 "$RUNNER_TEMP/git-askpass.sh"
           export GIT_ASKPASS="$RUNNER_TEMP/git-askpass.sh"
           export GIT_TERMINAL_PROMPT=0
-          # Sin credenciales persistentes ni hooks del proyecto.
           git config credential.helper ''
           git config core.hooksPath /dev/null
+          stage='comprobacion de main'
           git fetch --no-tags origin main
           if [[ "$(git rev-parse FETCH_HEAD)" != "$PUSH_SHA" ]]; then
-            echo '::error::main avanzo mientras se restauraba Firebase.'
-            report_failure
+            echo '::error::main avanzo desde este push. Se requiere revision; no se revierte un estado antiguo.'
             exit 1
           fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          stage='git revert'
           parent_count="$(git show -s --format=%P "$PUSH_SHA" | wc -w)"
           if [[ "$parent_count" -gt 1 ]]; then
             git revert --no-commit -m 1 "$PUSH_SHA"
           else
             git revert --no-commit "$PUSH_SHA"
           fi
+          stage='creacion del commit de reversion'
           git commit -m "Revert $PUSH_SHA por fallo E2E [skip ci]" \
             -m "Auto-Rollback-Of: $PUSH_SHA"
-          # Push normal: si main avanzo, falla sin sobrescribir el historial.
+          stage='push del revert (comprobar permisos y proteccion de main)'
+          # Push normal: si main avanzo o las reglas lo rechazan, falla sin forzar.
           git push origin HEAD:refs/heads/main
-          echo 'Firebase y main restaurados. Se conserva el historial de ambos.'
+          echo "Se publico un nuevo commit que revierte $PUSH_SHA."
