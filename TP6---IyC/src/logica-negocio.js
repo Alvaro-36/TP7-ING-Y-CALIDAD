@@ -91,6 +91,12 @@ export const cancelarReserva = (r, motivo) => {
 // ponytail: una reserva ocupa el slot de su hora en punto (11:30 → slot 11:00).
 const slotDe = (hora) => `${hora.slice(0, 2)}:00`
 
+export const reagendarReserva = (reservas, id, nuevaFecha, nuevaHora) => {
+  const reservaActual = reservas.find((reserva) => reserva.id === id)
+  if (!reservaActual) throw new Error('Reserva inválida')
+  return [...reservas, { ...reservaActual, fecha: nuevaFecha, hora: nuevaHora }]
+}
+
 export const generarSlots = (reservasDelDia) =>
   HORARIOS.map((hora) => ({
     hora,
