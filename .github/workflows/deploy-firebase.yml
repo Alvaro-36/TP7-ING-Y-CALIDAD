@@ -1,8 +1,6 @@
 name: Firebase Hosting - Desarrollo
 
 on:
-  pull_request:
-    branches: [develop]
   push:
     branches: [develop]
 
@@ -11,20 +9,21 @@ permissions:
 
 # Los despliegues se ejecutan en orden; no se interrumpe una publicacion activa.
 concurrency:
-  group: firebase-development-${{ github.event.pull_request.number || github.ref }}
+  group: firebase-development-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
-  build:
-    name: Validar y compilar desarrollo
+  deploy:
+    name: Desplegar a desarrollo
+    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
       run:
         shell: bash
-        working-directory: TP6---IyC
-    env:
-      CYPRESS_INSTALL_BINARY: '0'
+    environment:
+      name: development
+      url: ${{ steps.configuration.outputs.url }}
     steps:
       - name: Descargar codigo
         uses: actions/checkout@v4
@@ -37,55 +36,6 @@ jobs:
           node-version: '24'
           cache: npm
           cache-dependency-path: TP6---IyC/package-lock.json
-
-      - name: Instalar dependencias
-        run: npm ci
-
-      - name: Tests unitarios
-        run: npm run test:vitest
-
-      - name: Linter
-        run: npm run lint
-
-      - name: Verificar formato
-        run: npm run format:check
-
-      - name: Compilar frontend
-        run: npm run build
-
-      - name: Guardar build validado
-        uses: actions/upload-artifact@v4
-        with:
-          name: firebase-development-build
-          path: TP6---IyC/frontend/dist
-          if-no-files-found: error
-          retention-days: 7
-
-  deploy:
-    name: Desplegar a desarrollo
-    needs: build
-    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    environment:
-      name: development
-      url: ${{ steps.configuration.outputs.url }}
-    steps:
-      - name: Descargar configuracion de Hosting
-        uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-
-      - name: Configurar Node.js 24
-        uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-
-      - name: Recuperar build validado
-        uses: actions/download-artifact@v4
-        with:
-          name: firebase-development-build
-          path: TP6---IyC/frontend/dist
 
       - name: Verificar configuracion de desarrollo
         id: configuration
@@ -102,6 +52,16 @@ jobs:
             exit 1
           fi
           printf 'url=https://%s.web.app\n' "$FIREBASE_PROJECT_ID_DEV" >> "$GITHUB_OUTPUT"
+
+      - name: Instalar dependencias
+        working-directory: TP6---IyC
+        env:
+          CYPRESS_INSTALL_BINARY: '0'
+        run: npm ci
+
+      - name: Compilar frontend
+        working-directory: TP6---IyC
+        run: npm run build
 
       - name: Publicar en Firebase Hosting de desarrollo
         env:

@@ -5,14 +5,15 @@ avanzado del TP7 para la aplicacion `TP6---IyC`.
 
 ## Funcionamiento
 
-1. Todo PR hacia `develop` ejecuta instalacion reproducible (`npm ci`), tests
-   unitarios, linter, verificacion de formato y build en pasos separados.
-2. Al integrar el PR, GitHub genera un evento `push` sobre `develop`. Se repiten
-   las verificaciones sobre el codigo integrado y se guarda el build como artefacto.
-3. Solo si todas las verificaciones pasan, se publica ese mismo artefacto en
-   Firebase Hosting mediante la credencial guardada en GitHub Secrets.
+1. Los controles de calidad de los PR quedan a cargo del CI existente
+   (`hotfix-ci.yml`). Este workflow de Firebase no se ejecuta en los PR.
+2. Al integrar un PR a `develop`, GitHub genera un evento `push` que inicia el
+   despliegue automatico.
+3. El workflow instala las dependencias con `npm ci`, compila el frontend y
+   publica el build en Firebase Hosting mediante GitHub Secrets. No repite
+   tests, linter ni formato. Si la instalacion o el build fallan, no se publica.
 4. La ejecucion y la URL quedan registradas en Actions y en el Environment
-   `development`. Los PR no acceden a las credenciales de Firebase.
+   `development`.
 
 El evento `push` tambien cubre pushes directos a `develop`. La proteccion de rama
 debe exigir PR si el equipo quiere que todos los cambios se integren por merge.
@@ -53,16 +54,19 @@ por una variable de entorno, sin incluir el token como argumento del comando.
 
 ## Verificacion de la entrega
 
-1. Abrir un PR hacia `develop` y comprobar `Validar y compilar desarrollo` en verde.
-   `Desplegar a desarrollo` debe quedar omitido mientras el PR este abierto.
+1. Abrir un PR hacia `develop` y comprobar el CI existente. Los checks de
+   `Firebase Hosting - Desarrollo` no deben aparecer para ese commit del PR.
 2. Configurar los dos secrets y hacer merge del PR.
 3. En Actions, comprobar que la ejecucion de `Firebase Hosting - Desarrollo`
-   corresponde al commit integrado y que ambos jobs terminaron correctamente.
+   corresponde al commit integrado y que `Desplegar a desarrollo` termino
+   correctamente, con los pasos de instalacion, compilacion y publicacion.
 4. Abrir la URL del despliegue y verificar que carga AgendaYA.
 5. Guardar para el informe el enlace y las capturas de Actions, con los pasos de
-   calidad y el despliegue visibles, sin mostrar valores de secrets.
+   compilacion y el despliegue visibles, sin mostrar valores de secrets. Las
+   evidencias de calidad se obtienen de la ejecucion del CI existente en el PR.
 
-Si falla un check, `needs: build` impide el despliegue. Si faltan secrets, se
+Si falla la instalacion o la compilacion, el paso de publicacion no se ejecuta.
+Si faltan secrets, se
 muestra un error que identifica sus nombres. Corregir la configuracion y usar
 Re-run failed jobs en Actions para reintentar el despliegue del mismo commit.
 
