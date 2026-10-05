@@ -60,7 +60,7 @@ export const diasConReservas = (reservas, mes, anio) => {
 
 export const tamanoIndicador = (cantidad) => (cantidad <= 1 ? 'sm' : cantidad <= 3 ? 'md' : 'lg')
 
-export const obtenerReservaPorId = (reservas, id) => reservas.find((r) => r.id === id) ?? null
+export const obtenerReservaPorId = (reservas, id) => reservas.find((r) => String(r.id) === String(id)) ?? null
 
 export const formatearDetalle = (r) => ({
   cliente: r.cliente,
