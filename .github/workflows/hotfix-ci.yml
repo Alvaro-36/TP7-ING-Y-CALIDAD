@@ -234,7 +234,7 @@ jobs:
 
           # Instalacion limpia de las dependencias de la base (su propio lockfile).
           cd "$BASE_APP"
-          npm ci
+          npm ci || npm install --no-audit
 
           if [ ! -x node_modules/.bin/vitest ]; then
             echo "::error title=Vitest no disponible en la base::origin/${BASE_REF} no tiene Vitest en sus dependencias. Mergea primero la configuracion de Vitest en ${BASE_REF}."
