@@ -15,10 +15,8 @@ describe('INC-0522: reagendar una reserva libera el horario original', () => {
     ]
 
     const resultado = reagendarReserva(reservas, 1, fechaB, '15:00')
-    const slotB = generarSlots(resultado.filter((r) => r.fecha === fechaB))
-      .find((slot) => slot.hora === '15:00')
-    const slotA = generarSlots(resultado.filter((r) => r.fecha === fechaA))
-      .find((slot) => slot.hora === '10:00')
+    const slotB = generarSlots(resultado.filter((r) => r.fecha === fechaB)).find((slot) => slot.hora === '15:00')
+    const slotA = generarSlots(resultado.filter((r) => r.fecha === fechaA)).find((slot) => slot.hora === '10:00')
 
     expect(slotB.estado).toBe('Reservado')
     expect(slotA.estado).toBe('Disponible')
