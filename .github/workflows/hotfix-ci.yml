@@ -22,6 +22,8 @@ on:
     branches:
       - main
       - develop
+  # Permite que el workflow aparezca listado de inmediato en la pestana Actions de GitHub
+  workflow_dispatch:
 
 # Permisos minimos: solo lectura del repositorio.
 permissions:
