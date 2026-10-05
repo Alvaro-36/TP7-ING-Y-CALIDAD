@@ -1,0 +1,11 @@
+# Firebase y credenciales locales
+.firebase/
+firebase-debug.log*
+service-account*.json
+firebase-service-account*.json
+.env
+.env.*
+
+# Dependencias y archivos compilados
+node_modules/
+dist/
