@@ -94,7 +94,8 @@ const slotDe = (hora) => `${hora.slice(0, 2)}:00`
 export const reagendarReserva = (reservas, id, nuevaFecha, nuevaHora) => {
   const reservaActual = reservas.find((reserva) => reserva.id === id)
   if (!reservaActual) throw new Error('Reserva inválida')
-  return [...reservas, { ...reservaActual, fecha: nuevaFecha, hora: nuevaHora }]
+
+  return reservas.map((reserva) => (reserva.id === id ? { ...reserva, fecha: nuevaFecha, hora: nuevaHora } : reserva))
 }
 
 export const generarSlots = (reservasDelDia) =>

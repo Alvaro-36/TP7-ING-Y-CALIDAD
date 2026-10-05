@@ -233,8 +233,22 @@ jobs:
           done
 
           # Instalacion limpia de las dependencias de la base (su propio lockfile).
+          # Si el lockfile de origin/${BASE_REF} esta desincronizado, se regenera
+          # SOLO dentro del worktree temporal para poder ejecutar la regresion.
           cd "$BASE_APP"
-          npm ci
+          set +e
+          npm ci 2>&1 | tee "$WORK_DIR/base-npm-ci.log"
+          NPM_CI_STATUS=${PIPESTATUS[0]}
+          set -e
+          if [ "$NPM_CI_STATUS" -ne 0 ]; then
+            if grep -Fq 'can only install packages when your package.json and package-lock.json or npm-shrinkwrap.json are in sync' "$WORK_DIR/base-npm-ci.log"; then
+              echo "::warning title=Lockfile desincronizado en la base::Se detecto package-lock.json desactualizado en origin/${BASE_REF}. Se regenera temporalmente para validar regresion."
+              npm install --package-lock-only --no-audit --no-fund
+              npm ci
+            else
+              exit "$NPM_CI_STATUS"
+            fi
+          fi
 
           if [ ! -x node_modules/.bin/vitest ]; then
             echo "::error title=Vitest no disponible en la base::origin/${BASE_REF} no tiene Vitest en sus dependencias. Mergea primero la configuracion de Vitest en ${BASE_REF}."
