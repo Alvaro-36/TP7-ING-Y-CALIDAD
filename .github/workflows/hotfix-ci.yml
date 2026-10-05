@@ -62,6 +62,7 @@ jobs:
       # Si la rama de origen no empieza con hotfix/INC, ejecuta un test que no comprueba nada y siempre pasa positivo.
       - name: Test dummy (siempre pasa positivo si no es hotfix)
         if: ${{ !startsWith(github.head_ref, 'hotfix/INC') }}
+        working-directory: ${{ github.workspace }}
         run: |
           echo "Rama de origen: $HEAD_REF"
           echo "La rama no cumple con el prefijo hotfix/INC. Ejecutando test que no comprueba nada y siempre pasa positivo..."
@@ -169,6 +170,7 @@ jobs:
       # Si la rama de origen no empieza con hotfix/INC, ejecuta un test que no comprueba nada y siempre pasa positivo.
       - name: Test dummy (siempre pasa positivo si no es hotfix)
         if: ${{ !startsWith(github.head_ref, 'hotfix/INC') }}
+        working-directory: ${{ github.workspace }}
         run: |
           echo "Rama de origen: $HEAD_REF"
           echo "La rama no cumple con el prefijo hotfix/INC. Ejecutando test dummy en regression-proof..."
