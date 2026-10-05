@@ -8,6 +8,10 @@
     "build": "vite build frontend",
     "preview": "vite preview frontend",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "test:vitest": "vitest run",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "cy:open": "cypress open",
     "cy:run": "cypress run"
   },
@@ -15,8 +19,13 @@
     "transform": {}
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "cypress": "^15.21.1",
+    "eslint": "^10.12.0",
+    "globals": "^17.13.0",
     "jest": "^30.5.2",
-    "vite": "^8.3.0"
+    "prettier": "^3.9.9",
+    "vite": "^8.3.0",
+    "vitest": "^5.0.3"
   }
 }

@@ -10,12 +10,24 @@ describe('AgendaYA - M05 Gestión de Agenda', () => {
           'agendaya-reservas',
           JSON.stringify([
             {
-              id: 'r-test-oct', fecha: '2026-10-15', hora: '14:00', cliente: 'Carla Díaz',
-              telefono: '2614000001', tipoEvento: 'Consulta', estado: 'Pendiente', motivoCancelacion: null,
+              id: 'r-test-oct',
+              fecha: '2026-10-15',
+              hora: '14:00',
+              cliente: 'Carla Díaz',
+              telefono: '2614000001',
+              tipoEvento: 'Consulta',
+              estado: 'Pendiente',
+              motivoCancelacion: null,
             },
             {
-              id: 'r-test-nov', fecha: '2026-11-20', hora: '10:00', cliente: 'Martín Ruiz',
-              telefono: '2614000002', tipoEvento: 'Consulta', estado: 'Pendiente', motivoCancelacion: null,
+              id: 'r-test-nov',
+              fecha: '2026-11-20',
+              hora: '10:00',
+              cliente: 'Martín Ruiz',
+              telefono: '2614000002',
+              tipoEvento: 'Consulta',
+              estado: 'Pendiente',
+              motivoCancelacion: null,
             },
           ]),
         )

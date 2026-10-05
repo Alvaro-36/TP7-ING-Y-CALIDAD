@@ -1,0 +1,303 @@
+# =============================================================================
+# Hotfix CI
+#
+# Pipeline de control de calidad para ramas de hotfix (plan de mantenimiento).
+# - Se dispara en PRs hacia main y develop.
+# - Solo corre si la rama de origen empieza con "hotfix/INC"
+#   (formato esperado: hotfix/INC-XXXX-descripcion).
+# - Dos jobs en paralelo, ambos deben ser "required status checks":
+#     quality           -> tests unitarios, lint, formato, build y E2E.
+#     regression-proof  -> demuestra que el PR trae un test que reproduce el
+#                          defecto (falla en la base y pasa en el head).
+#
+# Seguridad: github.head_ref es controlado por quien abre el PR. Nunca se
+# interpola dentro de "run:"; siempre se pasa por variables de entorno.
+# =============================================================================
+name: Hotfix CI
+
+on:
+  pull_request:
+    # Ramas DESTINO del PR. El filtro por rama de ORIGEN se hace con "if" en
+    # cada job, porque pull_request no permite filtrar por head branch.
+    branches:
+      - main
+      - develop
+
+# Permisos minimos: solo lectura del repositorio.
+permissions:
+  contents: read
+
+# Si se pushean commits nuevos al mismo PR, se cancela la ejecucion anterior.
+concurrency:
+  group: hotfix-ci-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+# Todos los pasos "run" se ejecutan con bash dentro de la carpeta del proyecto.
+# (No aplica a los pasos "uses": a esos se les indica la ruta explicitamente.)
+defaults:
+  run:
+    shell: bash
+    working-directory: TP6---IyC
+
+env:
+  # Carpeta del proyecto relativa a la raiz del repo (valor fijo, no es input).
+  APP_DIR: TP6---IyC
+  NODE_VERSION: '20'
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Job 1: quality
+  # ---------------------------------------------------------------------------
+  quality:
+    name: quality
+    # Solo se ejecuta para ramas hotfix/INC*. Si no cumple, el job se omite.
+    if: startsWith(github.head_ref, 'hotfix/INC')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # head_ref/base_ref llegan a los scripts solo como variables de entorno.
+      HEAD_REF: ${{ github.head_ref }}
+      BASE_REF: ${{ github.base_ref }}
+    steps:
+      # Descarga el codigo del PR (merge commit de prueba que genera GitHub).
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Deja registro en el log de que rama se esta validando.
+      - name: Mostrar ramas del PR
+        run: |
+          echo "Rama de origen : $HEAD_REF"
+          echo "Rama de destino: $BASE_REF"
+
+      # Instala Node 20 y habilita la cache de ~/.npm usando el lockfile del proyecto.
+      - name: Configurar Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: TP6---IyC/package-lock.json
+
+      # Cachea el binario de Cypress (~/.cache/Cypress) para no descargarlo en cada corrida.
+      - name: Cache del binario de Cypress
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/Cypress
+          key: cypress-${{ runner.os }}-${{ hashFiles('TP6---IyC/package-lock.json') }}
+
+      # Instalacion limpia y reproducible a partir de package-lock.json.
+      - name: Instalar dependencias (npm ci)
+        run: npm ci
+
+      # 1) Tests unitarios con Vitest. Los tests estan escritos para Jest y
+      #    Vitest los ejecuta sin cambios (ver vitest.config.js).
+      - name: Tests unitarios (Vitest)
+        run: npx vitest run
+
+      # 2) Analisis estatico con ESLint (eslint.config.js).
+      - name: Linter (ESLint)
+        run: npx eslint .
+
+      # 3) Verifica que el codigo respete el formato de Prettier (no modifica archivos).
+      - name: Formato (Prettier --check)
+        run: npx prettier --check .
+
+      # 4) Build de produccion con Vite. La raiz de Vite es la carpeta frontend/
+      #    (igual que el script "build" de package.json).
+      - name: Build (vite build)
+        run: npx vite build frontend
+
+      # 5) Tests E2E con Cypress contra el servidor de desarrollo:
+      #    - start: levanta "npm run dev" en segundo plano.
+      #    - wait-on: espera a que http://localhost:5173 responda antes de correr Cypress.
+      #    - install: false porque las dependencias ya se instalaron con npm ci.
+      #    - video=true para tener grabaciones si algo falla (Cypress lo trae desactivado).
+      - name: Tests E2E (Cypress)
+        uses: cypress-io/github-action@v6
+        with:
+          working-directory: TP6---IyC
+          install: false
+          start: npm run dev
+          wait-on: 'http://localhost:5173'
+          wait-on-timeout: 120
+          browser: electron
+          config: video=true
+
+      # Si algun paso fallo, sube screenshots y videos de Cypress como artefacto.
+      - name: Subir screenshots y videos de Cypress
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cypress-artifacts-pr${{ github.event.pull_request.number }}-${{ github.run_attempt }}
+          path: |
+            TP6---IyC/cypress/screenshots
+            TP6---IyC/cypress/videos
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # ---------------------------------------------------------------------------
+  # Job 2: regression-proof (corre en paralelo con quality: no hay "needs")
+  # ---------------------------------------------------------------------------
+  regression-proof:
+    name: regression-proof
+    # Misma condicion que quality: si la rama no es hotfix/INC*, no corre ningun job.
+    if: startsWith(github.head_ref, 'hotfix/INC')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      HEAD_REF: ${{ github.head_ref }}
+      BASE_REF: ${{ github.base_ref }}
+      HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      # Este job no corre E2E: se evita descargar el binario de Cypress en npm ci.
+      CYPRESS_INSTALL_BINARY: '0'
+    steps:
+      # 1) Checkout del commit HEAD real del PR (no el merge commit) con todo el
+      #    historial, necesario para calcular el merge-base y crear el worktree.
+      - name: Checkout del head del PR (historial completo)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      # Node 20 con cache de npm (sirve para el head y para el worktree de la base,
+      # ambos comparten la cache ~/.npm).
+      - name: Configurar Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: TP6---IyC/package-lock.json
+
+      # 2) Detecta los tests (*.test.js / *.spec.js) agregados o modificados en el PR
+      #    respecto del merge-base con la rama destino, y los helpers/fixtures de test
+      #    que el PR agrega. Si no hay tests, el job falla con un mensaje claro.
+      - name: Detectar tests agregados o modificados en el PR
+        run: |
+          set -euo pipefail
+          echo "Rama de origen : $HEAD_REF ($HEAD_SHA)"
+          echo "Rama de destino: $BASE_REF"
+
+          # Asegura tener la punta actualizada de la rama destino.
+          git fetch --no-tags origin "+refs/heads/${BASE_REF}:refs/remotes/origin/${BASE_REF}"
+          MERGE_BASE="$(git merge-base "origin/${BASE_REF}" HEAD)"
+          echo "Merge-base con origin/${BASE_REF}: $MERGE_BASE"
+
+          # Carpeta temporal donde se guardan las listas y reportes del job.
+          WORK_DIR="$RUNNER_TEMP/regression"
+          mkdir -p "$WORK_DIR"
+          echo "WORK_DIR=$WORK_DIR" >> "$GITHUB_ENV"
+
+          # Tests agregados (A) o modificados (M). --relative devuelve rutas
+          # relativas a TP6---IyC y limita el diff a esa carpeta. Se excluyen los
+          # specs de Cypress (no son tests de Vitest).
+          git -c core.quotePath=false diff --name-only --relative --diff-filter=AM \
+            "$MERGE_BASE" HEAD -- '*.test.js' '*.spec.js' ':(exclude)cypress/**' \
+            > "$WORK_DIR/tests.txt"
+
+          # Helpers/fixtures de test NUEVOS (solo agregados) que no sean tests en si.
+          git -c core.quotePath=false diff --name-only --relative --diff-filter=A \
+            "$MERGE_BASE" HEAD -- \
+            ':(glob)tests/**' ':(glob)test/**' ':(glob)**/__tests__/**' \
+            ':(glob)**/fixtures/**' ':(glob)**/helpers/**' ':(glob)**/__mocks__/**' \
+            | { grep -Ev '\.(test|spec)\.js$' || true; } > "$WORK_DIR/helpers.txt"
+
+          if [ ! -s "$WORK_DIR/tests.txt" ]; then
+            echo "::error title=Falta el test de regresion::El PR no agrega ni modifica ningun archivo *.test.js / *.spec.js en ${APP_DIR} respecto de origin/${BASE_REF}. Todo hotfix debe incluir un test que reproduzca el defecto."
+            exit 1
+          fi
+
+          echo "Tests detectados:";  sed 's/^/  - /' "$WORK_DIR/tests.txt"
+          echo "Helpers/fixtures nuevos:"; sed 's/^/  - /' "$WORK_DIR/helpers.txt"
+          {
+            echo "### Tests de regresion detectados"
+            sed 's/^/- `/; s/$/`/' "$WORK_DIR/tests.txt"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # 3a) Crea un git worktree con la rama destino (main o develop), le copia
+      #     encima SOLO los tests y helpers detectados, e instala sus dependencias.
+      - name: Preparar worktree de la rama destino con los tests del PR
+        run: |
+          set -euo pipefail
+          BASE_WORKTREE="$RUNNER_TEMP/base-worktree"
+          git worktree add --detach "$BASE_WORKTREE" "origin/${BASE_REF}"
+          BASE_APP="$BASE_WORKTREE/$APP_DIR"
+          echo "BASE_APP=$BASE_APP" >> "$GITHUB_ENV"
+
+          # Copia cada archivo respetando su ruta relativa dentro del proyecto.
+          cat "$WORK_DIR/tests.txt" "$WORK_DIR/helpers.txt" | while IFS= read -r f; do
+            [ -z "$f" ] && continue
+            mkdir -p "$BASE_APP/$(dirname "$f")"
+            cp "$f" "$BASE_APP/$f"
+            echo "Copiado a la base: $f"
+          done
+
+          # Instalacion limpia de las dependencias de la base (su propio lockfile).
+          cd "$BASE_APP"
+          npm ci
+
+          if [ ! -x node_modules/.bin/vitest ]; then
+            echo "::error title=Vitest no disponible en la base::origin/${BASE_REF} no tiene Vitest en sus dependencias. Mergea primero la configuracion de Vitest en ${BASE_REF}."
+            exit 1
+          fi
+
+      # 3b) Ejecuta los tests del PR sobre el codigo de la base: DEBEN FALLAR.
+      #     Con el reporter JSON se verifica que fallaron por asercion
+      #     (numFailedTests > 0) y no por un error de carga/importacion.
+      - name: Ejecutar los tests en la base (deben fallar)
+        run: |
+          set -euo pipefail
+          cd "$BASE_APP"
+          mapfile -t TESTS < "$WORK_DIR/tests.txt"
+          REPORT="$WORK_DIR/base-report.json"
+
+          # Se tolera el codigo de salida: que falle es lo esperado.
+          set +e
+          npx --no-install vitest run \
+            --reporter=default --reporter=json --outputFile.json="$REPORT" \
+            "${TESTS[@]}"
+          VITEST_STATUS=$?
+          set -e
+          echo "Vitest en la base termino con codigo $VITEST_STATUS"
+
+          # Analiza el reporte JSON con Node.
+          REPORT="$REPORT" VITEST_STATUS="$VITEST_STATUS" node --input-type=commonjs - <<'EOF'
+          const fs = require('node:fs')
+          const { REPORT, VITEST_STATUS, BASE_REF } = process.env
+          const fail = (title, msg) => { console.log(`::error title=${title}::${msg}`); process.exit(1) }
+
+          if (!fs.existsSync(REPORT)) {
+            fail('Error de carga en la base', `Vitest no genero el reporte JSON (codigo ${VITEST_STATUS}). Los tests no llegaron a ejecutarse en origin/${BASE_REF}.`)
+          }
+          const r = JSON.parse(fs.readFileSync(REPORT, 'utf8'))
+          const files = r.testResults ?? []
+          const failedTests = r.numFailedTests ?? 0
+          const totalTests = r.numTotalTests ?? 0
+
+          // Archivo fallido sin ningun test recolectado = error de carga/importacion.
+          const loadErrors = files.filter((f) => f.status === 'failed' && (f.assertionResults ?? []).length === 0)
+          if (loadErrors.length > 0) {
+            const detail = loadErrors.map((f) => `${f.name}: ${(f.message || '').split('\n')[0]}`).join(' | ')
+            fail('Error de carga/importacion', `Los tests fallaron en la base por un error de carga, no por asercion: ${detail}`)
+          }
+          if (totalTests === 0) {
+            fail('Sin tests ejecutados', 'Vitest no ejecuto ningun test en la base (no encontro los archivos o estan vacios).')
+          }
+          if (failedTests === 0) {
+            fail('El test no reproduce el defecto', `Los ${totalTests} tests del PR PASAN sobre origin/${BASE_REF}: el test no reproduce el defecto.`)
+          }
+
+          console.log(`OK: ${failedTests} de ${totalTests} tests fallan en origin/${BASE_REF} por asercion (defecto reproducido):`)
+          for (const f of files) {
+            for (const t of f.assertionResults ?? []) {
+              if (t.status === 'failed') console.log(`  x ${t.fullName} -> ${(t.failureMessages?.[0] || '').split('\n')[0]}`)
+            }
+          }
+          EOF
+
+      # 4) Ejecuta los mismos tests sobre el head del PR (con el fix): DEBEN PASAR.
+      - name: Ejecutar los tests en el head del PR (deben pasar)
+        run: |
+          set -euo pipefail
+          npm ci
+          mapfile -t TESTS < "$WORK_DIR/tests.txt"
+          npx --no-install vitest run "${TESTS[@]}"
+          echo "OK: los tests de regresion pasan en el head del PR ($HEAD_REF)."

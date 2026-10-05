@@ -48,7 +48,9 @@ describe('cancelarReserva', () => {
   })
 
   test('lanza error si la reserva está completada', () => {
-    expect(() => cancelarReserva({ ...reservaBase(), estado: 'Completado' })).toThrow('No se puede cancelar una reserva completada')
+    expect(() => cancelarReserva({ ...reservaBase(), estado: 'Completado' })).toThrow(
+      'No se puede cancelar una reserva completada',
+    )
   })
 
   test('lanza error si la reserva es null o undefined', () => {

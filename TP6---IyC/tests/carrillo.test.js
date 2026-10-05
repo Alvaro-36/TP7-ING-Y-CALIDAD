@@ -15,9 +15,7 @@ describe('obtenerReservasDelDia', () => {
   })
 
   it('devuelve un array vacío si ninguna reserva corresponde a la fecha (caso límite)', () => {
-    const reservas = [
-      { id: 1, fecha: '2026-10-14', hora: '10:00' },
-    ]
+    const reservas = [{ id: 1, fecha: '2026-10-14', hora: '10:00' }]
     const resultado = obtenerReservasDelDia(reservas, '2026-10-16')
     expect(resultado).toEqual([])
   })
@@ -28,15 +26,11 @@ describe('obtenerReservasDelDia', () => {
       { id: 2, fecha: '2026-10-15', hora: '11:00' },
     ]
     const resultado = obtenerReservasDelDia(reservas, '2026-10-15')
-    expect(resultado).toEqual([
-      { id: 2, fecha: '2026-10-15', hora: '11:00' },
-    ])
+    expect(resultado).toEqual([{ id: 2, fecha: '2026-10-15', hora: '11:00' }])
   })
 
   it('devuelve un array vacío para entradas inválidas de fecha ya que no coinciden exactamente (comportamiento observable)', () => {
-    const reservas = [
-      { id: 1, fecha: '2026-10-14', hora: '10:00' },
-    ]
+    const reservas = [{ id: 1, fecha: '2026-10-14', hora: '10:00' }]
     expect(obtenerReservasDelDia(reservas, '')).toEqual([])
     expect(obtenerReservasDelDia(reservas, null)).toEqual([])
     expect(obtenerReservasDelDia(reservas, 'invalid-date')).toEqual([])
@@ -53,9 +47,9 @@ describe('obtenerReservasDelDia', () => {
       { id: 2, fecha: '2026-10-15', hora: '11:00' },
     ]
     const copia = structuredClone(reservas)
-    
+
     obtenerReservasDelDia(reservas, '2026-10-14')
-    
+
     expect(reservas).toEqual(copia)
   })
 })
@@ -111,9 +105,9 @@ describe('ordenarPorHora', () => {
       { id: 2, hora: '09:00' },
     ]
     const copia = structuredClone(reservas)
-    
+
     ordenarPorHora(reservas)
-    
+
     expect(reservas).toEqual(copia)
   })
 })

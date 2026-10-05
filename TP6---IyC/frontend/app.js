@@ -1,12 +1,38 @@
 import './style.css'
 import {
-  reservasDePrueba, aFechaISO, obtenerReservasDelDia, ordenarPorHora, diasConReservas, tamanoIndicador,
-  cambiarMes, generarDiasDelMes, obtenerReservaPorId, formatearDetalle, cancelarReserva,
-  validarMotivoCancelacion, normalizarMotivo, puedeCancelar, esEstadoFinal, generarSlots,
+  reservasDePrueba,
+  aFechaISO,
+  obtenerReservasDelDia,
+  ordenarPorHora,
+  diasConReservas,
+  tamanoIndicador,
+  cambiarMes,
+  generarDiasDelMes,
+  obtenerReservaPorId,
+  formatearDetalle,
+  cancelarReserva,
+  validarMotivoCancelacion,
+  normalizarMotivo,
+  puedeCancelar,
+  esEstadoFinal,
+  generarSlots,
 } from '../src/logica-negocio.js'
 
 const CLAVE = 'agendaya-reservas'
-const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
+const MESES = [
+  'Enero',
+  'Febrero',
+  'Marzo',
+  'Abril',
+  'Mayo',
+  'Junio',
+  'Julio',
+  'Agosto',
+  'Septiembre',
+  'Octubre',
+  'Noviembre',
+  'Diciembre',
+]
 
 function cargarReservas() {
   try {
@@ -71,15 +97,18 @@ function renderLista(delDia, ahora) {
   })
   return `
     <section>
-      <h3 data-cy="selected-day-title">Reservas del ${estado.diaSeleccionado}</h3>      ${tarjetas.length
-        ? `<ul data-cy="day-reservations-list">${tarjetas.join('')}</ul>`
-        : '<p data-cy="empty-day-message">No hay reservas programadas para este día</p>'}
+      <h3 data-cy="selected-day-title">Reservas del ${estado.diaSeleccionado}</h3>      ${
+        tarjetas.length
+          ? `<ul data-cy="day-reservations-list">${tarjetas.join('')}</ul>`
+          : '<p data-cy="empty-day-message">No hay reservas programadas para este día</p>'
+      }
     </section>`
 }
 
 function renderHorarios(delDia) {
   const filas = generarSlots(delDia).map(
-    (s) => `<li>${s.hora} <span data-cy="slot-status" data-hora="${s.hora}" class="${s.estado.toLowerCase()}">${s.estado}</span></li>`,
+    (s) =>
+      `<li>${s.hora} <span data-cy="slot-status" data-hora="${s.hora}" class="${s.estado.toLowerCase()}">${s.estado}</span></li>`,
   )
   return `<section><h3>Horarios</h3><ul class="horarios">${filas.join('')}</ul></section>`
 }
@@ -157,7 +186,9 @@ app.addEventListener('click', (e) => {
   } else if (accion === 'confirm-cancel') {
     const motivo = app.querySelector('[data-cy="cancel-reason-input"]').value
     if (!validarMotivoCancelacion(motivo).valido) return
-    estado.reservas = estado.reservas.map((r) => (r.id === estado.cancelandoId ? cancelarReserva(r, normalizarMotivo(motivo)) : r))
+    estado.reservas = estado.reservas.map((r) =>
+      r.id === estado.cancelandoId ? cancelarReserva(r, normalizarMotivo(motivo)) : r,
+    )
     guardarReservas()
     estado.cancelandoId = null
     estado.mensaje = 'La reserva fue cancelada'

@@ -1,0 +1,7 @@
+node_modules
+dist
+frontend/dist
+coverage
+package-lock.json
+cypress/screenshots
+cypress/videos

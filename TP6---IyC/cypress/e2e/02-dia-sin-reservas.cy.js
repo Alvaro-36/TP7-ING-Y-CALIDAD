@@ -1,8 +1,14 @@
 // M05-US09 Escenario 2: al seleccionar un día sin reservas se muestra el mensaje de día vacío.
 const reservas = [
   {
-    id: 1, fecha: '2026-10-15', hora: '10:00', cliente: 'Luis Pérez', telefono: '2615552222',
-    tipoEvento: 'Consulta general', estado: 'Confirmada', motivoCancelacion: null,
+    id: 1,
+    fecha: '2026-10-15',
+    hora: '10:00',
+    cliente: 'Luis Pérez',
+    telefono: '2615552222',
+    tipoEvento: 'Consulta general',
+    estado: 'Confirmada',
+    motivoCancelacion: null,
   },
 ]
 

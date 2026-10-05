@@ -7,12 +7,12 @@ describe('cambiarMes', () => {
   })
 
   it('lanza error si el mes es NaN', () => {
-  expect(() => cambiarMes(NaN, 2026, 1)).toThrow('Mes inválido')
-})
+    expect(() => cambiarMes(NaN, 2026, 1)).toThrow('Mes inválido')
+  })
 
-it('valida primero el mes y después el año', () => {
-  expect(() => cambiarMes(13, 2026.5, 1)).toThrow('Mes inválido')
-})
+  it('valida primero el mes y después el año', () => {
+    expect(() => cambiarMes(13, 2026.5, 1)).toThrow('Mes inválido')
+  })
 
   it('retrocede varios meses dentro del mismo año', () => {
     expect(cambiarMes(5, 2026, -2)).toEqual({ mes: 3, anio: 2026 })
@@ -59,10 +59,10 @@ it('valida primero el mes y después el año', () => {
 
   // No mutación
   it('modificar el resultado no afecta a llamadas posteriores', () => {
-  const r1 = cambiarMes(5, 2026, 1)
-  r1.mes = 99
-  expect(cambiarMes(5, 2026, 1)).toEqual({ mes: 6, anio: 2026 })
-})
+    const r1 = cambiarMes(5, 2026, 1)
+    r1.mes = 99
+    expect(cambiarMes(5, 2026, 1)).toEqual({ mes: 6, anio: 2026 })
+  })
 })
 
 describe('generarDiasDelMes', () => {

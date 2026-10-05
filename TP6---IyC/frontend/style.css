@@ -6,57 +6,260 @@
   --fondo: #f4f6f9;
 }
 
-body { font-family: system-ui, sans-serif; margin: 0; padding: 16px; color: #1f2937; background: var(--fondo); }
-h1 { margin: 0 0 16px; font-size: 1.5rem; }
-h3 { margin: 0 0 12px; font-size: 1rem; }
-main { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; align-items: start; }
-main > section { background: #fff; border: 1px solid var(--borde); border-radius: 12px; padding: 16px; box-shadow: 0 1px 3px rgb(0 0 0 / 0.06); }
-ul { list-style: none; padding: 0; margin: 0; }
+body {
+  font-family: system-ui, sans-serif;
+  margin: 0;
+  padding: 16px;
+  color: #1f2937;
+  background: var(--fondo);
+}
+h1 {
+  margin: 0 0 16px;
+  font-size: 1.5rem;
+}
+h3 {
+  margin: 0 0 12px;
+  font-size: 1rem;
+}
+main {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+main > section {
+  background: #fff;
+  border: 1px solid var(--borde);
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.06);
+}
+ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
 
-button { cursor: pointer; font: inherit; border: 1px solid var(--borde); background: #fff; border-radius: 8px; padding: 6px 12px; }
-button:hover:not(:disabled) { background: var(--fondo); }
-button:disabled { cursor: not-allowed; opacity: 0.45; }
+button {
+  cursor: pointer;
+  font: inherit;
+  border: 1px solid var(--borde);
+  background: #fff;
+  border-radius: 8px;
+  padding: 6px 12px;
+}
+button:hover:not(:disabled) {
+  background: var(--fondo);
+}
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
 
 /* Calendario */
-.calendario header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
-.calendario h2 { margin: 0; font-size: 1.15rem; }
-.calendario header button { width: 36px; height: 36px; padding: 0; font-size: 1.2rem; }
-.grilla { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; text-align: center; }
-.semana { font-size: 0.8rem; font-weight: 600; color: var(--texto-suave); padding-bottom: 4px; }
-.dia { position: relative; height: 40px; border: none; background: none; padding: 0; }
-.num { position: relative; display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; }
-.indicador { pointer-events: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); border-radius: 50%; background: #d7dbe0; }
-.indicador.sm { width: 22px; height: 22px; }
-.indicador.md { width: 30px; height: 30px; }
-.indicador.lg { width: 38px; height: 38px; }
-.dia.selected .num { background: var(--verde); color: #fff; font-weight: 600; }
+.calendario header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.calendario h2 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+.calendario header button {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  font-size: 1.2rem;
+}
+.grilla {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  text-align: center;
+}
+.semana {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--texto-suave);
+  padding-bottom: 4px;
+}
+.dia {
+  position: relative;
+  height: 40px;
+  border: none;
+  background: none;
+  padding: 0;
+}
+.num {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+}
+.indicador {
+  pointer-events: none;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: #d7dbe0;
+}
+.indicador.sm {
+  width: 22px;
+  height: 22px;
+}
+.indicador.md {
+  width: 30px;
+  height: 30px;
+}
+.indicador.lg {
+  width: 38px;
+  height: 38px;
+}
+.dia.selected .num {
+  background: var(--verde);
+  color: #fff;
+  font-weight: 600;
+}
 
 /* Tarjetas de reserva */
-.tarjeta { display: grid; grid-template-columns: 1fr auto; gap: 4px 8px; padding: 12px; margin-bottom: 8px; border: 1px solid var(--borde); border-left: 4px solid var(--verde); border-radius: 8px; cursor: pointer; transition: box-shadow 0.15s; }
-.tarjeta:hover { box-shadow: 0 2px 8px rgb(0 0 0 / 0.08); }
-.tarjeta [data-cy="reservation-phone"], .tarjeta [data-cy="reservation-time"] { color: var(--texto-suave); font-size: 0.9rem; }
-.tarjeta [data-cy="cancel-reservation"] { grid-column: 1 / -1; justify-self: start; color: var(--rojo); border-color: var(--rojo); }
-.estado { justify-self: end; font-size: 0.75rem; font-weight: 600; padding: 2px 8px; border-radius: 999px; }
-.estado-confirmada { background: #e3f5e8; color: #1e6b35; }
-.estado-pendiente { background: #fff4d6; color: #8a6100; }
-.estado-cancelada { background: #fde8e6; color: var(--rojo); }
-.estado-completado { background: #e6effd; color: #1d4ed8; }
-[data-cy="empty-day-message"] { color: var(--texto-suave); text-align: center; padding: 24px 0; border: 1px dashed var(--borde); border-radius: 8px; margin: 0; }
+.tarjeta {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px 8px;
+  padding: 12px;
+  margin-bottom: 8px;
+  border: 1px solid var(--borde);
+  border-left: 4px solid var(--verde);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: box-shadow 0.15s;
+}
+.tarjeta:hover {
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.08);
+}
+.tarjeta [data-cy='reservation-phone'],
+.tarjeta [data-cy='reservation-time'] {
+  color: var(--texto-suave);
+  font-size: 0.9rem;
+}
+.tarjeta [data-cy='cancel-reservation'] {
+  grid-column: 1 / -1;
+  justify-self: start;
+  color: var(--rojo);
+  border-color: var(--rojo);
+}
+.estado {
+  justify-self: end;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+.estado-confirmada {
+  background: #e3f5e8;
+  color: #1e6b35;
+}
+.estado-pendiente {
+  background: #fff4d6;
+  color: #8a6100;
+}
+.estado-cancelada {
+  background: #fde8e6;
+  color: var(--rojo);
+}
+.estado-completado {
+  background: #e6effd;
+  color: #1d4ed8;
+}
+[data-cy='empty-day-message'] {
+  color: var(--texto-suave);
+  text-align: center;
+  padding: 24px 0;
+  border: 1px dashed var(--borde);
+  border-radius: 8px;
+  margin: 0;
+}
 
 /* Horarios */
-.horarios li { display: flex; justify-content: space-between; padding: 8px 4px; border-bottom: 1px solid var(--borde); }
-.horarios li:last-child { border-bottom: none; }
-.horarios span { font-size: 0.8rem; font-weight: 600; padding: 2px 8px; border-radius: 999px; }
-.reservado { background: #fde8e6; color: var(--rojo); }
-.disponible { background: #e3f5e8; color: #1e6b35; }
+.horarios li {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 4px;
+  border-bottom: 1px solid var(--borde);
+}
+.horarios li:last-child {
+  border-bottom: none;
+}
+.horarios span {
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+.reservado {
+  background: #fde8e6;
+  color: var(--rojo);
+}
+.disponible {
+  background: #e3f5e8;
+  color: #1e6b35;
+}
 
 /* Modales y mensajes */
-.fondo { position: fixed; inset: 0; display: grid; place-items: center; background: rgb(0 0 0 / 0.4); }
-.modal { background: #fff; padding: 20px; border-radius: 12px; width: min(400px, 90vw); box-shadow: 0 10px 30px rgb(0 0 0 / 0.2); }
-.modal p { margin: 6px 0; }
-.modal button { margin-top: 12px; margin-right: 8px; }
-.modal textarea { display: block; width: 100%; box-sizing: border-box; margin: 8px 0; padding: 8px; font: inherit; border: 1px solid var(--borde); border-radius: 8px; }
-[data-cy="confirm-cancel"] { background: var(--rojo); color: #fff; border-color: var(--rojo); }
-[data-cy="confirm-cancel"]:hover:not(:disabled) { background: #a93226; }
-.error { color: var(--rojo); font-size: 0.9rem; margin: 0; }
-.exito { padding: 10px 14px; background: #e3f5e8; color: #1e6b35; border: 1px solid #b7e1c3; border-radius: 8px; }
+.fondo {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgb(0 0 0 / 0.4);
+}
+.modal {
+  background: #fff;
+  padding: 20px;
+  border-radius: 12px;
+  width: min(400px, 90vw);
+  box-shadow: 0 10px 30px rgb(0 0 0 / 0.2);
+}
+.modal p {
+  margin: 6px 0;
+}
+.modal button {
+  margin-top: 12px;
+  margin-right: 8px;
+}
+.modal textarea {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 8px 0;
+  padding: 8px;
+  font: inherit;
+  border: 1px solid var(--borde);
+  border-radius: 8px;
+}
+[data-cy='confirm-cancel'] {
+  background: var(--rojo);
+  color: #fff;
+  border-color: var(--rojo);
+}
+[data-cy='confirm-cancel']:hover:not(:disabled) {
+  background: #a93226;
+}
+.error {
+  color: var(--rojo);
+  font-size: 0.9rem;
+  margin: 0;
+}
+.exito {
+  padding: 10px 14px;
+  background: #e3f5e8;
+  color: #1e6b35;
+  border: 1px solid #b7e1c3;
+  border-radius: 8px;
+}

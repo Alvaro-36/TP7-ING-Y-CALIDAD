@@ -1,7 +1,14 @@
 // Funciones puras: ninguna muta sus argumentos. `mes` va de 1 a 12.
 
 const reserva = (id, fecha, hora, cliente, telefono, estado) => ({
-  id, fecha, hora, cliente, telefono, tipoEvento: 'Consulta general', estado, motivoCancelacion: null,
+  id,
+  fecha,
+  hora,
+  cliente,
+  telefono,
+  tipoEvento: 'Consulta general',
+  estado,
+  motivoCancelacion: null,
 })
 
 export const reservasDePrueba = [
@@ -64,7 +71,10 @@ export const formatearDetalle = (r) => ({
   estado: r.estado,
 })
 
-export const normalizarMotivo = (motivo) => String(motivo ?? '').trim().replace(/ +/g, ' ') || null
+export const normalizarMotivo = (motivo) =>
+  String(motivo ?? '')
+    .trim()
+    .replace(/ +/g, ' ') || null
 
 export const validarMotivoCancelacion = (motivo) =>
   String(motivo ?? '').trim().length > MAX_MOTIVO
@@ -84,10 +94,13 @@ const slotDe = (hora) => `${hora.slice(0, 2)}:00`
 export const generarSlots = (reservasDelDia) =>
   HORARIOS.map((hora) => ({
     hora,
-    estado: reservasDelDia.some((r) => r.estado !== 'Cancelada' && slotDe(r.hora) === hora) ? 'Reservado' : 'Disponible',
+    estado: reservasDelDia.some((r) => r.estado !== 'Cancelada' && slotDe(r.hora) === hora)
+      ? 'Reservado'
+      : 'Disponible',
   }))
 
-export const liberarSlot = (slots, r) => slots.map((s) => (s.hora === r.hora ? { ...s, estado: 'Disponible' } : { ...s }))
+export const liberarSlot = (slots, r) =>
+  slots.map((s) => (s.hora === r.hora ? { ...s, estado: 'Disponible' } : { ...s }))
 
 export const esReservaPasada = (r, ahora = new Date()) => {
   if (!r) throw new Error('Reserva inválida')
@@ -101,7 +114,8 @@ export const puedeCancelar = (r, ahora = new Date()) => {
   return !esReservaPasada(r, ahora) && !ESTADOS_FINALES.includes(r.estado)
 }
 
-export const accionesDisponibles = (r, ahora) => (puedeCancelar(r, ahora) ? ['ver-detalle', 'cancelar'] : ['ver-detalle'])
+export const accionesDisponibles = (r, ahora) =>
+  puedeCancelar(r, ahora) ? ['ver-detalle', 'cancelar'] : ['ver-detalle']
 
 export const transicionEstadoValida = (desde, hacia) => TRANSICIONES[desde]?.includes(hacia) ?? false
 

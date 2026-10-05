@@ -2,14 +2,25 @@
 import { filtrarPorEstado, esMismoDia } from '../src/logica-negocio.js'
 
 const reserva = (id, estado) => ({
-  id, fecha: '2026-10-15', hora: '10:00', cliente: `Cliente ${id}`, telefono: '', tipoEvento: 'Consulta general',
-  estado, motivoCancelacion: null,
+  id,
+  fecha: '2026-10-15',
+  hora: '10:00',
+  cliente: `Cliente ${id}`,
+  telefono: '',
+  tipoEvento: 'Consulta general',
+  estado,
+  motivoCancelacion: null,
 })
 
 describe('filtrarPorEstado', () => {
   it('devuelve solo las reservas con el estado pedido', () => {
     // Arrange
-    const reservas = [reserva(1, 'Confirmada'), reserva(2, 'Pendiente'), reserva(3, 'Confirmada'), reserva(4, 'Cancelada')]
+    const reservas = [
+      reserva(1, 'Confirmada'),
+      reserva(2, 'Pendiente'),
+      reserva(3, 'Confirmada'),
+      reserva(4, 'Cancelada'),
+    ]
 
     // Act
     const resultado = filtrarPorEstado(reservas, 'Confirmada')
