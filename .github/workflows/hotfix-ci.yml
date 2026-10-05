@@ -52,8 +52,6 @@ jobs:
   # ---------------------------------------------------------------------------
   quality:
     name: quality
-    # Solo se ejecuta para ramas hotfix/INC*. Si no cumple, el job se omite.
-    if: startsWith(github.head_ref, 'hotfix/INC')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
@@ -61,18 +59,29 @@ jobs:
       HEAD_REF: ${{ github.head_ref }}
       BASE_REF: ${{ github.base_ref }}
     steps:
+      # Si la rama de origen no empieza con hotfix/INC, ejecuta un test que no comprueba nada y siempre pasa positivo.
+      - name: Test dummy (siempre pasa positivo si no es hotfix)
+        if: ${{ !startsWith(github.head_ref, 'hotfix/INC') }}
+        run: |
+          echo "Rama de origen: $HEAD_REF"
+          echo "La rama no cumple con el prefijo hotfix/INC. Ejecutando test que no comprueba nada y siempre pasa positivo..."
+          node --input-type=module -e "import test from 'node:test'; import assert from 'node:assert'; test('test dummy que no comprueba nada y siempre pasa positivo', () => { assert.strictEqual(true, true); });"
+
       # Descarga el codigo del PR (merge commit de prueba que genera GitHub).
       - name: Checkout
+        if: startsWith(github.head_ref, 'hotfix/INC')
         uses: actions/checkout@v4
 
       # Deja registro en el log de que rama se esta validando.
       - name: Mostrar ramas del PR
+        if: startsWith(github.head_ref, 'hotfix/INC')
         run: |
           echo "Rama de origen : $HEAD_REF"
           echo "Rama de destino: $BASE_REF"
 
       # Instala Node 20 y habilita la cache de ~/.npm usando el lockfile del proyecto.
       - name: Configurar Node.js ${{ env.NODE_VERSION }}
+        if: startsWith(github.head_ref, 'hotfix/INC')
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -81,6 +90,7 @@ jobs:
 
       # Cachea el binario de Cypress (~/.cache/Cypress) para no descargarlo en cada corrida.
       - name: Cache del binario de Cypress
+        if: startsWith(github.head_ref, 'hotfix/INC')
         uses: actions/cache@v4
         with:
           path: ~/.cache/Cypress
@@ -88,24 +98,29 @@ jobs:
 
       # Instalacion limpia y reproducible a partir de package-lock.json.
       - name: Instalar dependencias (npm ci)
+        if: startsWith(github.head_ref, 'hotfix/INC')
         run: npm ci
 
       # 1) Tests unitarios con Vitest. Los tests estan escritos para Jest y
       #    Vitest los ejecuta sin cambios (ver vitest.config.js).
       - name: Tests unitarios (Vitest)
+        if: startsWith(github.head_ref, 'hotfix/INC')
         run: npx vitest run
 
       # 2) Analisis estatico con ESLint (eslint.config.js).
       - name: Linter (ESLint)
+        if: startsWith(github.head_ref, 'hotfix/INC')
         run: npx eslint .
 
       # 3) Verifica que el codigo respete el formato de Prettier (no modifica archivos).
       - name: Formato (Prettier --check)
+        if: startsWith(github.head_ref, 'hotfix/INC')
         run: npx prettier --check .
 
       # 4) Build de produccion con Vite. La raiz de Vite es la carpeta frontend/
       #    (igual que el script "build" de package.json).
       - name: Build (vite build)
+        if: startsWith(github.head_ref, 'hotfix/INC')
         run: npx vite build frontend
 
       # 5) Tests E2E con Cypress contra el servidor de desarrollo:
@@ -114,6 +129,7 @@ jobs:
       #    - install: false porque las dependencias ya se instalaron con npm ci.
       #    - video=true para tener grabaciones si algo falla (Cypress lo trae desactivado).
       - name: Tests E2E (Cypress)
+        if: startsWith(github.head_ref, 'hotfix/INC')
         uses: cypress-io/github-action@v6
         with:
           working-directory: TP6---IyC
@@ -126,7 +142,7 @@ jobs:
 
       # Si algun paso fallo, sube screenshots y videos de Cypress como artefacto.
       - name: Subir screenshots y videos de Cypress
-        if: failure()
+        if: failure() && startsWith(github.head_ref, 'hotfix/INC')
         uses: actions/upload-artifact@v4
         with:
           name: cypress-artifacts-pr${{ github.event.pull_request.number }}-${{ github.run_attempt }}
@@ -141,8 +157,6 @@ jobs:
   # ---------------------------------------------------------------------------
   regression-proof:
     name: regression-proof
-    # Misma condicion que quality: si la rama no es hotfix/INC*, no corre ningun job.
-    if: startsWith(github.head_ref, 'hotfix/INC')
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
@@ -152,9 +166,18 @@ jobs:
       # Este job no corre E2E: se evita descargar el binario de Cypress en npm ci.
       CYPRESS_INSTALL_BINARY: '0'
     steps:
+      # Si la rama de origen no empieza con hotfix/INC, ejecuta un test que no comprueba nada y siempre pasa positivo.
+      - name: Test dummy (siempre pasa positivo si no es hotfix)
+        if: ${{ !startsWith(github.head_ref, 'hotfix/INC') }}
+        run: |
+          echo "Rama de origen: $HEAD_REF"
+          echo "La rama no cumple con el prefijo hotfix/INC. Ejecutando test dummy en regression-proof..."
+          node --input-type=module -e "import test from 'node:test'; import assert from 'node:assert'; test('regression-proof dummy: siempre pasa positivo', () => { assert.strictEqual(true, true); });"
+
       # 1) Checkout del commit HEAD real del PR (no el merge commit) con todo el
       #    historial, necesario para calcular el merge-base y crear el worktree.
       - name: Checkout del head del PR (historial completo)
+        if: startsWith(github.head_ref, 'hotfix/INC')
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -163,6 +186,7 @@ jobs:
       # Node 20 con cache de npm (sirve para el head y para el worktree de la base,
       # ambos comparten la cache ~/.npm).
       - name: Configurar Node.js ${{ env.NODE_VERSION }}
+        if: startsWith(github.head_ref, 'hotfix/INC')
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -173,6 +197,7 @@ jobs:
       #    respecto del merge-base con la rama destino, y los helpers/fixtures de test
       #    que el PR agrega. Si no hay tests, el job falla con un mensaje claro.
       - name: Detectar tests agregados o modificados en el PR
+        if: startsWith(github.head_ref, 'hotfix/INC')
         run: |
           set -euo pipefail
           echo "Rama de origen : $HEAD_REF ($HEAD_SHA)"
@@ -217,6 +242,7 @@ jobs:
       # 3a) Crea un git worktree con la rama destino (main o develop), le copia
       #     encima SOLO los tests y helpers detectados, e instala sus dependencias.
       - name: Preparar worktree de la rama destino con los tests del PR
+        if: startsWith(github.head_ref, 'hotfix/INC')
         run: |
           set -euo pipefail
           BASE_WORKTREE="$RUNNER_TEMP/base-worktree"
@@ -245,6 +271,7 @@ jobs:
       #     Con el reporter JSON se verifica que fallaron por asercion
       #     (numFailedTests > 0) y no por un error de carga/importacion.
       - name: Ejecutar los tests en la base (deben fallar)
+        if: startsWith(github.head_ref, 'hotfix/INC')
         run: |
           set -euo pipefail
           cd "$BASE_APP"
@@ -297,6 +324,7 @@ jobs:
 
       # 4) Ejecuta los mismos tests sobre el head del PR (con el fix): DEBEN PASAR.
       - name: Ejecutar los tests en el head del PR (deben pasar)
+        if: startsWith(github.head_ref, 'hotfix/INC')
         run: |
           set -euo pipefail
           npm ci
